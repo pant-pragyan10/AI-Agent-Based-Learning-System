@@ -90,10 +90,21 @@ Content:
     def review(self, content, grade):
         rule_feedback = self._rule_check(content)
         llm_result = self._llm_review(content, grade)
+        # Prefer rule-based checks: if any rule feedback exists, mark fail.
+        # Otherwise trust the LLM's status.
+        llm_status = llm_result.get("status", "fail")
 
-        final_feedback = rule_feedback + llm_result.get("feedback", [])
-
-        status = "pass" if not final_feedback else "fail"
+        if rule_feedback:
+            status = "fail"
+            final_feedback = rule_feedback + llm_result.get("feedback", [])
+        else:
+            status = llm_status
+            # Only include feedback when status is fail. If LLM reports pass,
+            # return an empty feedback list per spec.
+            if status == "pass":
+                final_feedback = []
+            else:
+                final_feedback = llm_result.get("feedback", [])
 
         return {
             "status": status,
